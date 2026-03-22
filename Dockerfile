@@ -1,7 +1,28 @@
 FROM letsdone/devcontainer-base:0.1.1-all
 USER root
 
+#region Add dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      fonts-noto-cjk fonts-wqy-zenhei fonts-wqy-microhei \
+      xfce4 xfce4-goodies x11vnc xvfb novnc websockify supervisor \
+    && apt-get autoremove -y && apt-get clean -y
+#endregion
+
 ARG USERNAME=dev
+USER ${USERNAME}
+#region Install Playwright, chromium
+RUN source ~/.zshrc && install_nodejs \
+    && npm install -g playwright \
+    && npx playwright install --with-deps chromium
+#endregion
+
+#region supervisor && gui startup script
+USER root
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY start-gui.sh /usr/bin/start-gui.sh
+#endregion
+
 #region Install Claude CLI if needed
 ARG CLAUDE_PREINSTALLED=false
 USER ${USERNAME}
@@ -35,5 +56,7 @@ RUN if [ "${CODEX_PREINSTALLED}" = "true" ]; then \
 # Switch to dev user
 USER ${USERNAME}
 WORKDIR /home/${USERNAME}/workspace
+
+EXPOSE 6080 5900
 
 ENTRYPOINT [ "/bin/zsh" ]
